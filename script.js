@@ -24,13 +24,39 @@ class Vector{
 }
 
 class Level{
+	//input data should be correct no data check functions here
 	constructor(plan){
 		this.width = plan[0].length;
 		this.height = plan.length;
 		this.grid = [];
 		this.actors = [];
+		for (var y = 0; y < this.height; y++) {
+			var line = plan[y], gridLine = [];
+			for (var x = 0; x < this.width; x++) {
+				var ch = line[x], fieldType = null;
+				var Actor = this.actorChars[ch];
+				if (Actor)
+					this.actors.push(new Actor(new Vector(x, y), ch));
+				else if (ch == "x")
+					fieldType = "wall";
+				else if (ch == "!")
+					fieldType = "lava";
+				gridLine.push(fieldType);
+			}
+			this.grid.push(gridLine);
+		}
+		this.player = this.actors.filter(function(actor) {return actor.type == "player";})[0];
+		this.status = this.finishDelay = null;
 	}
 
-
-
+	//chek  for delay after completing Level
+	isFinished (){
+		return this.status !== null && this.finishDelay < 0;
+	}
 }
+//Not using babel js to const elem directly in class. (mb later) Indetefier of elements in level array.
+Level.prototype.actorChars = {
+	"@": Player,
+	"o": Coin,
+	"!": Lava, 
+};
