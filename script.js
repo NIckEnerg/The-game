@@ -100,3 +100,15 @@ Level.prototype.actorChars = {
 	"v": Lava
 };
 
+var someLVL = [
+"         ",
+" ####### ",
+" #     # ",
+" #  @  # ",
+" ####### ",
+"         "
+];
+
+var classTest = new Level(someLVL);
+var test = document.selectElementById("test");
+test.textContext = classTest.grid;
