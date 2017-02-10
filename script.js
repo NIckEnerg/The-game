@@ -72,9 +72,10 @@ class Level{
 			for (var x = 0; x < this.width; x++) {
 				var ch = line[x], fieldType = null;
 				var Actor = this.actorChars[ch];
+				console.log(Actor);
 				if (Actor)
-					this.actors.push(new Actor(new Vector(x, y), ch));
-				else if (ch == "x")
+					this.actors.push(new Actor(new Vector(x, y), ch));	//for moving objects
+				else if (ch == "#")			//static objects will push to array
 					fieldType = "wall";
 				else if (ch == "!")
 					fieldType = "lava";
@@ -82,7 +83,7 @@ class Level{
 			}
 			this.grid.push(gridLine);
 		}
-		this.player = this.actors.filter(function(actor) {return actor.type == "player";})[0];
+		this.player = this.actors.filter(function(actor) {return actor.type == "player";})[0]; //player pos 
 		this.status = this.finishDelay = null;
 	}
 
@@ -91,7 +92,7 @@ class Level{
 		return this.status !== null && this.finishDelay < 0;
 	}
 }
-//Not using babel js to const elem directly in class. (mb later) Indetefier of elements in level array.
+//Not using babel js to const elem directly in class. (mb later) Indetefier of moving elements in level array.
 Level.prototype.actorChars = {
 	"@": Player,
 	"o": Coin,
@@ -103,12 +104,18 @@ Level.prototype.actorChars = {
 var someLVL = [
 "         ",
 " ####### ",
-" #     # ",
+" #  !  # ",
 " #  @  # ",
 " ####### ",
 "         "
 ];
 
 var classTest = new Level(someLVL);
-var test = document.selectElementById("test");
-test.textContext = classTest.grid;
+var test = document.getElementById("test");
+for (var i = 0; i < classTest.grid.length; i++) {
+	var line = "";
+	for (var n = 0; n < classTest.grid[i].length; n++) {
+		line += ((classTest.grid[i][n] === null) ? "____" : classTest.grid[i][n]);
+	}
+	test.innerHTML += line + "<p>";
+}
