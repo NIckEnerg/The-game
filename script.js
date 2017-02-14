@@ -7,7 +7,7 @@ class Vector{
 
 	add(vector){
 		if (vector instanceof Vector)
-			return new Vector(vector.x + this.x, vector.u + this.y);
+			return new Vector(vector.x + this.x, vector.y + this.y);
 		else return new Error("Not a vector");
 	}
 
@@ -27,7 +27,7 @@ class Vector{
 // don't think using one parent class for three children will save me any time. Player, Coin and Lava class to operate this objects.
 class Player {
 	constructor(pos){
-		this.pos = pos.add(new Vector (0, 0.5)); //because player top size x1.5 of other elements top size and we need to move it  higher
+		this.pos = pos.add(new Vector (0, -0.5)); //because player top size x1.5 of other elements top size and we need to move it  higher
 		this.size = new Vector (0.8, 1.5); // player size
 		this.speed = new Vector (0, 0); // start player speed
 	}
@@ -72,7 +72,6 @@ class Level{
 			for (var x = 0; x < this.width; x++) {
 				var ch = line[x], fieldType = null;
 				var Actor = this.actorChars[ch];
-				console.log(Actor);
 				if (Actor)
 					this.actors.push(new Actor(new Vector(x, y), ch));	//for moving objects
 				else if (ch == "#")			//static objects will push to array
@@ -101,15 +100,99 @@ Level.prototype.actorChars = {
 	"v": Lava
 };
 
+class DOMDisplay {
+	constructor(parentNode, level){
+		this.screen = parentNode.appendChild(this.createScreenElement("div", "game"));
+		this.level = level;
+		this.scale = 20;									//game scale
+		this.screen.appendChild(this.drawBackground());		
+		this.actorLayer = null;
+		this.drawFrame();
+	}
+
+	createScreenElement(name, className){			
+		var node = document.createElement(name);
+		if (className) node.className = className;
+		return node;
+	}
+
+	//background means all static objects.
+	drawBackground(){	
+		var table = this.createScreenElement("table", "background");		//using table for background. will be removed by canvas afer testing
+		table.style.width = this.level.width * this.scale + "px";
+		this.level.grid.forEach(function(row){			
+			var rowElement = table.appendChild(this.createScreenElement("tr"));
+			rowElement.style.height = this.scale + "px";
+			row.forEach(function(type){
+				rowElement.appendChild(this.createScreenElement("td", type));
+			}.bind(this));
+		}.bind(this));
+		return table;
+	}
+
+	//draw moving objects
+	drawActors(){														
+		var  screen = this.createScreenElement("div");
+		this.level.actors.forEach(function(actor){
+			var rect = screen.appendChild(this.createScreenElement("div", "actor "+ actor.type));	//add few classes for one actor such as actor lava/player
+			//position and size on screen
+			rect.style.width = actor.size.x * this.scale + "px";
+			rect.style.height = actor.size.y * this.scale + "px";
+			rect.style.left = actor.pos.x * this.scale + "px";
+			rect.style.top = actor.pos.y * this.scale + "px";
+		}.bind(this));
+		return screen;
+	}
+
+	drawFrame(){
+		if(this.actorLayer) 
+			this.screen.removeChild(this.actorLayer);	//clean old actors before draw new frame
+		this.actorLayer = this.screen.appendChild(this.drawActors());
+		this.screen.className = "game" + (this.level.status || "");	//add css class for win or lose affects
+		this.scrollView();  //camera moving
+	}
+
+	scrollView (){
+		var width = this.screen.clientWidth;
+		var height = this.screen.clientHeight;
+
+		//scrin scroll when player pos closer then
+		var marginX = width / 4;
+		var marginY = height / 4;
+
+		var left = this.screen.scrollLeft, right = left + width;
+		var top = this.screen.scrollTop, bottom = top + height;
+		var player = this.level.player;
+
+		//player center position 
+		var center = player.pos.add(player.size.multiply(0.5)).multiply(this.scale);
+		
+		if (center.x < left + marginX)
+			this.screen.scrollLeft = center.x - marginX;
+		else if (center.x > right - marginX)
+			this.screen.scrollLeft = center.x + marginX - width;
+		if (center.y < top + marginY)
+			this.screen.scrollTop = center.y - marginY;
+		else if (center.y > bottom - marginY) 
+			this.screen.scrollTop = center.y + marginY - height;
+	}
+
+	clearScreen (){
+		this.screen.parentNode.removeChild(this.screen);
+	} 
+}
+
+
 var someLVL = [
 "         ",
 " ####### ",
-" #  !  # ",
+" #  ! o# ",
+"         ",
 " #  @  # ",
 " ####### ",
 "         "
 ];
-
+/*
 var classTest = new Level(someLVL);
 var test = document.getElementById("test");
 for (var i = 0; i < classTest.grid.length; i++) {
@@ -118,4 +201,6 @@ for (var i = 0; i < classTest.grid.length; i++) {
 		line += ((classTest.grid[i][n] === null) ? "____" : classTest.grid[i][n]);
 	}
 	test.innerHTML += line + "<p>";
-}
+}*/
+ var someGame = new Level(someLVL);
+ var display = new DOMDisplay (document.body, someGame);
