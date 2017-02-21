@@ -24,12 +24,82 @@ class Vector{
 	}
 }
 
-// don't think using one parent class for three children will save me any time. Player, Coin and Lava class to operate this objects.
+// Player, Coin and Lava class to operate this objects.
 class Player {
 	constructor(pos){
 		this.pos = pos.add(new Vector (0, -0.5)); //because player top size x1.5 of other elements top size and we need to move it  higher
 		this.size = new Vector (0.8, 1.5); // player size
 		this.speed = new Vector (0, 0); // start player speed
+		this.maxSpeed = 9;				//max x speed
+		this.speedChange = 6;			//speed changing during time
+		this.gravity = 30;
+		this.jumpSpeed = 19;
+	}
+
+	//operating X and Y coordinates separately. |9| - max X speed, if player faster he will slow down whith each frame.
+	moveX (step, level, keys){
+		var timeSpeedChange = this.speedChange * step;
+
+		if (keys.left && !keys.right){
+			if(this.speed.x <= -this.maxSpeed)
+				this.speed.x = Math.min(this.speed.x + timeSpeedChange, -this.maxSpeed);       	  //if speed x < max speed player will slow down
+			else if(this.speed.x > 0)
+				this.speed.x = Math.max(this.speed.x - timeSpeedChange, 0) - timeSpeedChange;		  //if speed x > 0 player will slowdown and then accelerate
+			else
+				this.speed.x = Math.max(this.speed.x - timeSpeedChange, -this.maxSpeed);				  //if 0 > speed x > - speed max
+		}
+		else if (keys.right && !keys.left){
+			if(this.speed.x >= this.maxSpeed)
+				this.speed.x = Math.max(this.speed.x - timeSpeedChange, this.maxSpeed);       	  //if speed x > max speed player will slow down
+			else if(this.speed.x < 0)
+				this.speed.x = Math.min(this.speed.x + timeSpeedChange, 0) + timeSpeedChange;		  //if speed x < 0 player will slow down and then accelerate
+			else
+				this.speed.x = Math.min(this.speed.x + timeSpeedChange, this.maxSpeed);				  //if 0 < speedChange x < speed max
+		}
+		else if (this.speed.x > 0)																	//when both left and right pressed and when none pressed player wil slowdown
+			this.speed.x = Math.max(this.speed.x - timeSpeedChange, 0);
+		else 
+			this.speed.x = Math.min(this.speed.x + timeSpeedChange, 0);
+
+		var motion = new Vector(this.speed.x * step, 0);
+		var newPos = this.pos.add(motion);
+		var obstacle = level.obstacleAt(newPos, this.size);
+		if(obstacle){																			//check free space to move
+			level.playerTouched(obstacle);		
+			this.speed.x = 0;}																	//!!!!!!!!!!!!!		Check this later. bug possibility	!!!!!!!!!!!!!!								
+		else
+			this.pos = newPos; 
+	}	
+
+	moveY(step, level, keys){
+		this.speed.y += step * this.gravity;
+		var motion = new Vector (0, this.speed.y * step);
+		var newPos = this.pos.add(motion);
+		var obstacle = level.obstacleAt(newPos, this.size);
+		if(obstacle){
+			level.playerTouched(obstacle);
+			if (keys.up && this.speed.y > 0)
+				this.speed.y = -this.jumpSpeed;
+			else
+				this.speed.y = 0;
+		}
+		else
+			this.pos = newPos;
+	}
+
+	act(step, level, keys){
+		this.moveX(step, level, keys);
+		this.moveY(step, level, keys);
+
+		var otherActor = level.actorAt(this);				//check for actors at this pos
+		if(otherActor)
+			level.playerTouched(otherActor.type, otherActor);
+
+		//losind animation
+		if (level,status == "lost"){
+			this.pos.y += step;
+			this.size.y -= step;
+		}
 	}
 }
 Player.prototype.type = "player"; // no const now available inside class construction :/ 
@@ -47,8 +117,18 @@ class Lava {
 			this.repeatPos = pos;			// dat lava type will return to start position when touch wall
 		}
 	}
+
+	act (step, level){
+		var newPos = this.pos.add(this.speed.multiply(step));
+		if(!level.obstacleAt(newPos, this.size))				//check new if new position possible
+			this.pos = newPos;
+		else if(this.repeatPos)									//for dropping lava
+			this.pos = this.repeatPos;
+		else 
+			this.speed = this.speed.multiply(-1);				//for flying lava
+	}
 }
-Lava.prototype.type = "lava";// sadness...
+Lava.prototype.type = "lava";
 
 //Coin for mmm... Coins! Everybody loves it. (some day replace them by dollars)
 class Coin {
@@ -56,6 +136,14 @@ class Coin {
 		this.basePos = this.pos = pos.add(new Vector(0.2, 0.1)); // coins shoud fly
 		this.size = new Vector (0.6, 0.6);
 		this.randomMove = Math.random() * Math.PI * 2; //random pos to desynchronize all coins movement
+		this.randomSpeed = Math.random() * 4 + 4;		
+		this.randomDist = Math.random() * 0.03 + 0.04;
+	}
+
+	act(step) {																//coin random moving
+		this.randomMove += step * this.randomSpeed;
+		var  randomPos = Math.sin(this.randomMove) * this.randomDist;
+		this.pos = this.basePos.add(new Vector(0, randomPos));
 	}
 }
 Coin.prototype.type = "coin"; 
@@ -84,14 +172,71 @@ class Level{
 		}
 		this.player = this.actors.filter(function(actor) {return actor.type == "player";})[0]; //player pos 
 		this.status = this.finishDelay = null;
+		this.maxStep = 0.05;  
 	}
 
 	//chek  for delay after completing Level
 	isFinished (){
 		return this.status !== null && this.finishDelay < 0;
 	}
+	
+	obstacleAt(pos, size){
+		var xStart = Math.floor(pos.x);
+		var xEnd = Math.ceil(pos.x + size.x);
+		var yStart = Math.floor(pos.y);
+		var yEnd = Math.ceil(pos.y + size.y);
+
+		if(xStart < 0 || xEnd > this.width || yStart < 0) //level border will be wall if player reaches it
+			return 'wall'; 
+		if (yEnd < this.height) // level floor border == lava
+			return "lava";
+		for (var y = yStart; y < yEnd; y++){
+			for (var  x = xStart; x < xEnd; x++){
+				var fieldType = this.grid[y][x];
+				if(fieldType) return fieldType; // check if player hit smth like wall or lava
+			}
+		}
+	}
+
+	actorAt (actor){
+		for (var i = 0; i <this.actor.lenght; i++){
+			var other = this.actors[i];
+			//check if actor hits another actors
+			if (other != actor && actor.pos.x + actor.size.x > other.pos.x && actor.pos.x < other.pos.x + other.size.x && 
+				actor.pos.y + actor.size.y > other.pos.y && actor.pos.y < other.pos.y + other.size.y)
+				return other;
+		}
+	}
+	
+	animate (step, keys){		//step - differense between last frame times, for smooth animation. Keys - pressed keyboard keys.
+		if (this.status !== null)
+			this.finishDelay -= step;
+		while (step > 0){		// make from 1 big step many small, helps to make more percise movement
+			var thisStep = Math.min(step, this.maxStep);
+			this.actors.forEach(function(actor) {actor.act(thisStep, this, keys);}, this);	//each actor will do it own class action
+			step -= thisStep;
+		}
+	}
+
+	playerTouched(type, actor){
+		if(type == "lava" && this.status === null){
+			this.status = "lost";
+			this.finishDelay = 1;
+		} 
+		//if actor type == coin remove it from actors arr 
+		else if (type == "coin"){
+			this.actors = this.actors.filter(function(other){
+				return other != actor; 							
+			});
+			//check for coins in actors arr
+			if(!this.actors.some(function(actor){return actor.type == "coin";})){
+				this.status = "won";
+				this.finishDelay = 1;
+			}
+		}
+	}
 }
-//Not using babel js to const elem directly in class. (mb later) Indetefier of moving elements in level array.
+//Not using babel js to const elem directly in class. (mb later) Indetefier of moving elements (actors) in level array.
 Level.prototype.actorChars = {
 	"@": Player,
 	"o": Coin,
